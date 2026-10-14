@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --blue:#99B9FF;
+}
+
+
+.main-header {
+  display: flex;
+  flex-direction: column;
+  font-weight: bold;
+}
+
+.main-header h1 {
+  font-size: 32px;
+}
+  
+main {
+  padding: 20;
+}  
+
+.body {
+  display: flex;
+  align-items: center;
+  gap: 10;
+}
+
+
+.content {
+  display: flex;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
