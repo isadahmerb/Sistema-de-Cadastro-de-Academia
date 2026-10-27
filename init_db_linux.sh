@@ -7,7 +7,7 @@ set -uo pipefail
 # Caminhos do projeto (este script fica na raiz do projeto, ao lado da pasta backend)
 DIR_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ_PROJETO="$DIR_SCRIPT"
-DIRETORIO_BANCO="$RAIZ_PROJETO/backend"
+DIRETORIO_BANCO="$RAIZ_PROJETO/Sistema-de-Cadastro-de-Academia/backend"
 ARQUIVO_BANCO="$DIRETORIO_BANCO/db.db"
 
 if ! command -v sqlite3 >/dev/null 2>&1; then
