@@ -74,6 +74,9 @@ app.MapGet("/clientes", () =>
 app.MapPost("/clientes", (CreateClientRequest new_client) =>
 {
     // TODO: Validação das informações recebidas
+
+    if (Utils.GetAmountOfMembrosWithCPF(new_client.cpf, sqlConnection) > 0)
+        return Results.Conflict($"O CPF {new_client.cpf} já é usado por outro cliente");
     
     string query = @"INSERT INTO Membros (Nome, Cpf, Telefone, Endereco, data_cadastro)
                  VALUES ($nome, $cpf, $telefone, $endereco, $data);
@@ -95,3 +98,15 @@ app.MapPost("/clientes", (CreateClientRequest new_client) =>
 app.Run();
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
+
+class Utils
+{
+    public static long GetAmountOfMembrosWithCPF(string cpf, SqliteConnection sqlConnection)
+    {
+        using var command = sqlConnection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM Membros WHERE cpf = @cpf";
+        command.Parameters.AddWithValue("@cpf", cpf);
+
+        return (long)command.ExecuteScalar()!;
+    }    
+}
