@@ -41,9 +41,9 @@ app.MapPost("/clientes", (CreateClientRequest new_client) =>
     command.Parameters.AddWithValue("$data", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 
     long id = (long)command.ExecuteScalar()!;
-    // return Results.Created($"/clientes/{id}", new { id });
+    return Results.Created($"/clientes/{id}", new { id });
     
-    return "Adding client: " + new_client.name + " " + new_client.cpf + " " + new_client.telefone + " " + new_client.address;
+    // return "Adding client: " + new_client.name + " " + new_client.cpf + " " + new_client.telefone + " " + new_client.address;
 }).WithName("addClient");
 
 app.Run();
