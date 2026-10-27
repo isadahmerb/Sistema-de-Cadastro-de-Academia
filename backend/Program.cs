@@ -24,7 +24,26 @@ if (app.Environment.IsDevelopment()) { app.MapOpenApi(); }
 
 app.UseHttpsRedirection();
 
-app.MapGet("/clientes/{id}", (int id) => $"Getting client {id}").WithName("getClient");
+app.MapGet("/clientes/{id}", (int id) =>
+{
+    // TODO: Validação das informações recebidas
+
+    string query = @"SELECT * FROM Membros WHERE id = @id";
+
+    using SqliteCommand command = new(query, sqlConnection);
+    command.Parameters.AddWithValue("@id", id);
+    
+    using var reader = command.ExecuteReader();
+
+    if (!reader.Read())
+        return Results.NotFound();
+
+    Dictionary<string, object?> cliente = new();
+    for (int i = 0; i < reader.FieldCount; i++)
+        cliente.Add(reader.GetName(i), reader.GetValue(i));
+    
+    return Results.Ok(cliente);
+}).WithName("getClient");
 app.MapPost("/clientes", (CreateClientRequest new_client) =>
 {
     // TODO: Validação das informações recebidas
