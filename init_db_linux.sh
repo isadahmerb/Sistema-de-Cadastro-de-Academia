@@ -4,9 +4,9 @@
 
 set -uo pipefail
 
-# Caminhos do projeto (este script fica na mesma pasta do create_database.py)
+# Caminhos do projeto (este script fica na raiz do projeto, ao lado da pasta backend)
 DIR_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RAIZ_PROJETO="$(dirname "$DIR_SCRIPT")"
+RAIZ_PROJETO="$DIR_SCRIPT"
 DIRETORIO_BANCO="$RAIZ_PROJETO/backend"
 ARQUIVO_BANCO="$DIRETORIO_BANCO/db.db"
 

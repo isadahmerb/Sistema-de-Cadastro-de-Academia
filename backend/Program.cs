@@ -7,35 +7,16 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+if (app.Environment.IsDevelopment()) { app.MapOpenApi(); }
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+app.MapGet("/clients/{id}", (int id) => $"Getting client {id}").WithName("getClient");
+app.MapPost("/clients", (CreateClientRequest new_client) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    return "Adding client: " + new_client.name + " " + new_client.cpf + " " + new_client.telefone + " " + new_client.address;
+}).WithName("addClient");
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+record CreateClientRequest(string name, string cpf, string telefone, string address);
