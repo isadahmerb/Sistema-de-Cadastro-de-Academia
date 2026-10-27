@@ -27,13 +27,7 @@ app.UseHttpsRedirection();
 app.MapGet("/clientes/{id}", (int id) => $"Getting client {id}").WithName("getClient");
 app.MapPost("/clientes", (CreateClientRequest new_client) =>
 {
-    // string forma_da_tabela_query = "PRAGMA table_info(Membros)";
-    // using SqliteCommand command = new (forma_da_tabela_query, sqlConnection);
-    // using var reader  = command.ExecuteReader();
-    // while (reader.Read())
-    // {
-    //     Console.WriteLine($"{reader["name"]} | {reader["type"]}");
-    // }
+    // TODO: Validação das informações recebidas
     
     string query = @"INSERT INTO Membros (Nome, Cpf, Telefone, Endereco, data_cadastro)
                  VALUES ($nome, $cpf, $telefone, $endereco, $data);
