@@ -44,6 +44,33 @@ app.MapGet("/clientes/{id}", (int id) =>
     
     return Results.Ok(cliente);
 }).WithName("getClient");
+app.MapGet("/clientes", () =>
+{
+    // TODO: Validação das informações recebidas
+
+    string query = @"SELECT * FROM Membros";
+
+    using SqliteCommand command = new(query, sqlConnection);
+    
+    using var reader = command.ExecuteReader();
+
+    if (!reader.Read())
+        return Results.NotFound();
+
+    List<Dictionary<string, object?>> clientes = new();
+    while (reader.Read())
+    {
+        var cliente = new Dictionary<string, object?>();
+
+        for (int i = 0; i < reader.FieldCount; i++)
+            cliente[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+
+        clientes.Add(cliente);
+    }
+    
+    return Results.Ok(clientes);
+}).WithName("getClients");
+
 app.MapPost("/clientes", (CreateClientRequest new_client) =>
 {
     // TODO: Validação das informações recebidas
