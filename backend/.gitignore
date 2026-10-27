@@ -249,3 +249,5 @@ ModelManifest.xml
 *.db
 *.db-shm
 *.db-wal
+
+db.db
