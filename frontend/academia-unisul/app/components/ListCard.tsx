@@ -15,6 +15,7 @@ type ListCardProps = {
   searchPlaceholder?: string;
   actionLabel: string;
   actionHref: string;
+  onSelect?: (item: ListItem) => void;
 };
 
 const normalize = (s: string) =>
@@ -26,6 +27,7 @@ export default function ListCard({
   searchPlaceholder = "Pesquisar nome",
   actionLabel,
   actionHref,
+  onSelect,
 }: ListCardProps) {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<ListItem["id"] | null>(null);
@@ -55,7 +57,10 @@ export default function ListCard({
           <li key={item.id}>
             <button
               type="button"
-              onClick={() => setSelectedId(item.id)}
+              onClick={() => {
+                setSelectedId(item.id);
+                onSelect?.(item);
+              }}
               className={`flex h-10 w-full items-center justify-between border-b border-black px-3 text-left ${
                 selectedId === item.id
                   ? "bg-blue-300"
