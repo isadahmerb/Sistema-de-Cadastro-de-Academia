@@ -20,7 +20,7 @@ const alunos: ListItem[] = [
 
 export default function HomePage() {
     return (
-        <main>
+        <main style={{ margin: "10vh auto" }}>
             <header className="main-header">
                 <h1>ACADEMIA UNISUL</h1>
                 <p>Perfil ADM</p>
