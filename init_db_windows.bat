@@ -69,7 +69,8 @@ rem ---------------------------------------------------------------
 ::SQL|    nome TEXT NOT NULL,
 ::SQL|    cargo TEXT NOT NULL,
 ::SQL|    login TEXT NOT NULL UNIQUE,
-::SQL|    senha_hash TEXT NOT NULL
+::SQL|    senha_hash TEXT NOT NULL,
+::SQL|    senha_salt TEXT NOT NULL
 ::SQL|);
 ::SQL|
 ::SQL|CREATE TABLE IF NOT EXISTS Treinos (
@@ -144,6 +145,14 @@ rem ---------------------------------------------------------------
 ::SQL|    )
 ::SQL|);
 ::SQL|
+::SQL|CREATE TABLE IF NOT EXISTS Current_sessions (
+::SQL|    session_token TEXT NOT NULL PRIMARY KEY,
+::SQL|    last_used TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+::SQL|
+::SQL|    -- Token com exatamente 32 caracteres
+::SQL|    CHECK (length(session_token) = 32)
+::SQL|);
+::SQL|
 ::SQL|-- Indices para consultas pelas chaves estrangeiras
 ::SQL|CREATE INDEX IF NOT EXISTS idx_treinos_membro
 ::SQL|    ON Treinos(id_membro);
@@ -162,3 +171,6 @@ rem ---------------------------------------------------------------
 ::SQL|
 ::SQL|CREATE INDEX IF NOT EXISTS idx_historico_treino
 ::SQL|    ON Historico_Atividades(id_treino);
+::SQL|
+::SQL|CREATE INDEX IF NOT EXISTS idx_current_sessions_last_used
+::SQL|    ON current_sessions(last_used);

@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS Funcionarios (
     nome TEXT NOT NULL,
     cargo TEXT NOT NULL,
     login TEXT NOT NULL UNIQUE,
-    senha_hash TEXT NOT NULL
+    senha_hash TEXT NOT NULL,
+    senha_salt TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Treinos (
@@ -114,6 +115,14 @@ CREATE TABLE IF NOT EXISTS Historico_Atividades (
     )
 );
 
+CREATE TABLE IF NOT EXISTS Current_sessions (
+    session_token TEXT NOT NULL PRIMARY KEY,
+    last_used TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- Token com exatamente 32 caracteres
+    CHECK (length(session_token) = 32)
+);
+
 -- Indices para consultas pelas chaves estrangeiras
 CREATE INDEX IF NOT EXISTS idx_treinos_membro
     ON Treinos(id_membro);
@@ -132,6 +141,9 @@ CREATE INDEX IF NOT EXISTS idx_historico_funcionario
 
 CREATE INDEX IF NOT EXISTS idx_historico_treino
     ON Historico_Atividades(id_treino);
+
+CREATE INDEX IF NOT EXISTS idx_current_sessions_last_used
+    ON current_sessions(last_used);
 SQL
 then
     echo "Banco de dados criado/verificado com sucesso!"
