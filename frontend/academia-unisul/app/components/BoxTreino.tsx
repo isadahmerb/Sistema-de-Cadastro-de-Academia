@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export type Treino = { id: string; nome: string; exercicios: string[] };
+
 export type Pagamento = {
   id: number;
   referencia: string;
@@ -73,7 +75,9 @@ export default function BoxTreino({ aluno }: { aluno: Aluno | null }) {
         <div>
           <div className="mb-1 flex items-center justify-between">
             <h3 className="font-bold">Treino</h3>
-            <button className="border border-black px-3 text-xs font-bold">Editar</button>
+            <Link href="/addwo" className="border border-black px-3 text-xs font-bold">
+              Editar
+            </Link>
           </div>
 
           <div className="space-y-1">

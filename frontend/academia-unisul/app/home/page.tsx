@@ -80,7 +80,7 @@ export default function HomePage() {
                     title="Lista de membros"
                     items={itens}
                     actionLabel="Cadastrar membro"
-                    actionHref="/addmembros"
+                    actionHref="/register"
                     onSelect={(item) => setAlunoId(Number(item.id))}
                 />
                 <BoxTreino aluno={aluno} />

@@ -12,7 +12,6 @@ export default function LoginPage() {
 
   function handleSubmit(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
-    console.log("clicou");
     router.push("/home");
   }
 
