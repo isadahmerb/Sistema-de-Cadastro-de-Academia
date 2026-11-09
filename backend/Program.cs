@@ -130,10 +130,55 @@ app.MapPost("/employee", (CreateEmployeeRequest new_employee) =>
     }
 }).WithName("addEmployee");
 
+app.MapPost("/login", (LoginRequest request) =>
+{
+    if (string.IsNullOrWhiteSpace(request.login) || string.IsNullOrEmpty(request.password))
+        return Results.BadRequest("Informe login e senha");
+
+    byte[] storedHash;
+    byte[] salt;
+
+    {
+        using SqliteCommand command = new(
+            "SELECT senha_hash, senha_salt FROM Funcionarios WHERE login = $login",
+            sqlConnection);
+        command.Parameters.AddWithValue("$login", request.login);
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return Results.Unauthorized();
+
+        storedHash = Convert.FromBase64String(reader.GetString(0));
+        salt = Convert.FromBase64String(reader.GetString(1));
+    }
+
+    byte[] computedHash = Rfc2898DeriveBytes.Pbkdf2(
+        request.password,
+        salt,
+        100_000,
+        HashAlgorithmName.SHA256,
+        storedHash.Length);
+
+    if (!CryptographicOperations.FixedTimeEquals(computedHash, storedHash))
+        return Results.Unauthorized();
+
+    string token = RandomNumberGenerator.GetHexString(32, lowercase: true);
+
+    using SqliteCommand insert = new(
+        @"INSERT INTO Current_sessions (session_token, last_used)
+          VALUES ($token, CURRENT_TIMESTAMP)",
+        sqlConnection);
+    insert.Parameters.AddWithValue("$token", token);
+    insert.ExecuteNonQuery();
+
+    return Results.Ok(new { token });
+}).WithName("login");
+
 app.Run();
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
 record CreateEmployeeRequest(string name, string role, string login, string password);
+record LoginRequest(string login, string password);
 
 class Utils
 {
