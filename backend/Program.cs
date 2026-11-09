@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 String connectionString = "Data Source=db.db";
@@ -95,9 +96,44 @@ app.MapPost("/clientes", (CreateClientRequest new_client) =>
     // return "Adding client: " + new_client.name + " " + new_client.cpf + " " + new_client.telefone + " " + new_client.address;
 }).WithName("addClient");
 
+app.MapPost("/employee", (CreateEmployeeRequest new_employee) =>
+{
+    // TODO: Validação das informações recebidas
+
+    string query = @"INSERT INTO Funcionarios (nome, cargo, login, senha_hash, senha_salt)
+                 VALUES ($nome, $cargo, $login, $senha_hash, $senha_salt);
+                 SELECT last_insert_rowid();";
+
+    byte[] salt = RandomNumberGenerator.GetBytes(16);
+    byte[] hash = Rfc2898DeriveBytes.Pbkdf2(
+        new_employee.password,
+        salt,
+        100_000,
+        HashAlgorithmName.SHA256,
+        32);
+
+    using SqliteCommand command = new(query, sqlConnection);
+    command.Parameters.AddWithValue("$nome", new_employee.name);
+    command.Parameters.AddWithValue("$cargo", new_employee.role);
+    command.Parameters.AddWithValue("$login", new_employee.login);
+    command.Parameters.AddWithValue("$senha_hash", Convert.ToBase64String(hash));
+    command.Parameters.AddWithValue("$senha_salt", Convert.ToBase64String(salt));
+
+    try
+    {
+        long id = (long)command.ExecuteScalar()!;
+        return Results.Created($"/employee/{id}", new { id });
+    }
+    catch (SqliteException e) when (e.SqliteErrorCode == 19)
+    {
+        return Results.Conflict($"O login {new_employee.login} já é usado por outro funcionário");
+    }
+}).WithName("addEmployee");
+
 app.Run();
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
+record CreateEmployeeRequest(string name, string role, string login, string password);
 
 class Utils
 {
