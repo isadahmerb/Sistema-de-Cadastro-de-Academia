@@ -55,9 +55,6 @@ app.MapGet("/clientes", () =>
     
     using var reader = command.ExecuteReader();
 
-    if (!reader.Read())
-        return Results.NotFound();
-
     List<Dictionary<string, object?>> clientes = new();
     while (reader.Read())
     {
