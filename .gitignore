@@ -1,0 +1,7 @@
+
+# IDE (Rider/JetBrains)
+.idea/
+
+# Build .NET
+bin/
+obj/
