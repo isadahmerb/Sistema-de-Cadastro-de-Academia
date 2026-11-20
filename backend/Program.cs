@@ -9,7 +9,7 @@ if (!File.Exists(dbPath))
 }
 
 var builder = WebApplication.CreateBuilder(args);
-String connectionString = "Data Source={dbPath};Mode=ReadWrite";
+String connectionString = $"Data Source={dbPath};Mode=ReadWrite";
 var sqlConnection = new SqliteConnection(connectionString);
 try
 {

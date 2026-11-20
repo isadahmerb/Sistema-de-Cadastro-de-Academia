@@ -1,0 +1,122 @@
+name: Teste de reprodução (clone → cadastro → consulta)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  reproducao-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      URL: http://localhost:5000
+    steps:
+      - name: Clonar repositório
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libicu-dev
+
+      - name: Instalar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Instalar sqlite3
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+
+      - name: Inicializar banco
+        run: |
+          bash init_db_linux.sh
+          echo "Arquivos .db encontrados:"
+          find . -name "*.db" | tee dbs.txt
+          test "$(wc -l < dbs.txt)" -eq 1
+          sqlite3 backend/db.db ".tables"
+
+      - name: Compilar backend
+        run: dotnet build backend --configuration Release
+
+      - name: Falha de inicialização deve ser clara (banco ausente)
+        run: |
+          mv backend/db.db backend/db.db.bak
+          set +e
+          (cd backend && timeout 30 dotnet run --no-build -c Release --urls "$URL" > ../falha_inicializacao.log 2>&1)
+          code=$?
+          set -e
+          mv backend/db.db.bak backend/db.db
+          cat falha_inicializacao.log
+          # 124 = timeout (app ficou de pé); 0 = saiu sem erro. Ambos estão errados.
+          if [ "$code" -eq 0 ] || [ "$code" -eq 124 ]; then
+            echo "A aplicação deveria ter abortado sem o banco (exit=$code)"
+            exit 1
+          fi
+
+      - name: Subir backend
+        run: |
+          cd backend
+          nohup dotnet run --no-build -c Release --urls "$URL" > ../backend.log 2>&1 &
+          echo $! > ../backend.pid
+          for i in $(seq 1 30); do
+            curl -s -o /dev/null "$URL/clientes" && exit 0
+            sleep 1
+          done
+          echo "Backend não subiu"
+          cat ../backend.log
+          exit 1
+
+      - name: Cadastro e consulta
+        run: |
+          code=$(curl -s -o resp.json -w "%{http_code}" -X POST "$URL/clientes" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Teste Silva","cpf":"12345678900","telefone":"48999999999","address":"Rua A, 1"}')
+          cat resp.json; echo
+          test "$code" = "201"
+
+          curl -sf "$URL/clientes/1" | tee cliente.json
+          echo
+          grep -q "Teste Silva" cliente.json
+
+          curl -sf "$URL/clientes" | tee lista.json
+          echo
+          grep -q "Teste Silva" lista.json
+
+          # CPF repetido deve dar 409
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$URL/clientes" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Outro","cpf":"12345678900","telefone":"1","address":"x"}')
+          test "$code" = "409"
+
+      - name: Dados estão no mesmo arquivo do inicializador
+        run: |
+          sqlite3 backend/db.db "SELECT id, Nome, Cpf FROM Membros;" | tee membros.txt
+          grep -q "Teste Silva" membros.txt
+
+      - name: Reiniciar e conferir persistência
+        run: |
+          kill "$(cat backend.pid)" || true
+          sleep 2
+          cd backend
+          nohup dotnet run --no-build -c Release --urls "$URL" > ../backend2.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -s -o /dev/null "$URL/clientes" && break
+            sleep 1
+          done
+          curl -sf "$URL/clientes" | tee ../depois_restart.json
+          echo
+          grep -q "Teste Silva" ../depois_restart.json
+
+      - name: Guardar evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencias-reproducao
+          retention-days: 14
+          path: |
+            dbs.txt
+            membros.txt
+            *.json
+            *.log
