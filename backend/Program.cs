@@ -1,8 +1,15 @@
 using Microsoft.Data.Sqlite;
 using System.Security.Cryptography;
 
+var dbPath = "db.db";
+if (!File.Exists(dbPath))
+{
+    Console.WriteLine($"Banco de dados não encontrado em {Path.GetFullPath(dbPath)}");
+    Environment.Exit(1);
+}
+
 var builder = WebApplication.CreateBuilder(args);
-String connectionString = "Data Source=db.db";
+String connectionString = "Data Source={dbPath};Mode=ReadWrite";
 var sqlConnection = new SqliteConnection(connectionString);
 try
 {
@@ -12,6 +19,7 @@ try
 catch (SqliteException e)
 {
     Console.WriteLine(e.Message);
+    Environment.Exit(1);
 }
 
 // Add services to the container.
