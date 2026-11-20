@@ -1,0 +1,169 @@
+name: Teste de persistência entre reinicializações
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  persistencia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      URL: http://localhost:5000
+
+    steps:
+      - name: Clonar repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libicu-dev sqlite3 jq
+
+      - name: Instalar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Inicializar banco
+        run: |
+          set -euo pipefail
+          rm -f backend/db.db
+          bash init_db_linux.sh
+          test -f backend/db.db
+          sqlite3 backend/db.db ".tables"
+
+      - name: Compilar backend
+        run: dotnet build backend --configuration Release
+
+      - name: Iniciar backend
+        run: |
+          set -euo pipefail
+          cd backend
+          nohup dotnet bin/Release/net10.0/backend.dll \
+            --urls "$URL" > ../backend.log 2>&1 &
+          echo $! > ../backend.pid
+
+          for i in $(seq 1 30); do
+            if curl -s -o /dev/null "$URL/clientes"; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          cat ../backend.log
+          exit 1
+
+      - name: Criar registros e verificar banco
+        run: |
+          set -euxo pipefail
+          code=$(curl -s -o cliente1.json -w "%{http_code}" \
+            -X POST "$URL/clientes" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Persistencia Um","cpf":"11111111111","telefone":"48999999999","address":"Rua A, 1"}')
+          test "$code" = "201"
+
+          code=$(curl -s -o cliente2.json -w "%{http_code}" \
+            -X POST "$URL/clientes" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Persistencia Dois","cpf":"22222222222","telefone":"48988888888","address":"Rua B, 2"}')
+          test "$code" = "201"
+
+          id1=$(jq -r '.id // .Id' cliente1.json)
+          id2=$(jq -r '.id // .Id' cliente2.json)
+
+          test -n "$id1" && test "$id1" != "null"
+          test -n "$id2" && test "$id2" != "null"
+
+          echo "$id1" > cliente1.id
+          echo "$id2" > cliente2.id
+
+          curl -fsS "$URL/clientes/$id1" | tee consulta1.json
+          curl -fsS "$URL/clientes/$id2" | tee consulta2.json
+
+          grep -q "Persistencia Um" consulta1.json
+          grep -q "Persistencia Dois" consulta2.json
+
+          sqlite3 backend/db.db \
+            "SELECT nome, cpf FROM Membros ORDER BY id;" | tee banco_antes.txt
+
+          grep -q "Persistencia Um|11111111111" banco_antes.txt
+          grep -q "Persistencia Dois|22222222222" banco_antes.txt
+
+      - name: Encerrar backend
+        run: |
+          set -euo pipefail
+          pid=$(cat backend.pid)
+          kill -TERM "$pid"
+          for i in $(seq 1 35); do
+            state=$(awk '{print $3}' "/proc/$pid/stat" 2>/dev/null || echo "DEAD")
+            if [ "$state" = "DEAD" ] || [ "$state" = "Z" ]; then
+              if ! curl -s -o /dev/null "$URL/clientes"; then
+                echo "Backend encerrado com sucesso em ${i}s (estado: $state)"
+                exit 0
+              fi
+            fi
+            sleep 1
+          done
+          echo "Backend não encerrou após 35s"
+          ps -fp "$pid" || true
+          exit 1
+
+      - name: Reiniciar backend
+        run: |
+          set -euo pipefail
+          cd backend
+          nohup dotnet bin/Release/net10.0/backend.dll \
+            --urls "$URL" > ../backend_restart.log 2>&1 &
+          echo $! > ../backend_restart.pid
+
+          for i in $(seq 1 30); do
+            if curl -s -o /dev/null "$URL/clientes"; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          cat ../backend_restart.log
+          exit 1
+
+      - name: Verificar persistência após reinicialização
+        run: |
+          set -euo pipefail
+          id1=$(cat cliente1.id)
+          id2=$(cat cliente2.id)
+
+          curl -fsS "$URL/clientes/$id1" | tee depois1.json
+          curl -fsS "$URL/clientes/$id2" | tee depois2.json
+
+          grep -q "Persistencia Um" depois1.json
+          grep -q "11111111111" depois1.json
+          grep -q "Persistencia Dois" depois2.json
+          grep -q "22222222222" depois2.json
+
+          curl -fsS "$URL/clientes" | tee lista_depois.json
+
+          grep -q "Persistencia Um" lista_depois.json
+          grep -q "Persistencia Dois" lista_depois.json
+
+          sqlite3 backend/db.db \
+            "SELECT nome, cpf FROM Membros ORDER BY id;" | tee banco_depois.txt
+
+          diff banco_antes.txt banco_depois.txt
+
+          echo "Persistência confirmada!"
+
+      - name: Guardar evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencias-persistencia
+          retention-days: 14
+          path: |
+            *.json
+            *.txt
+            *.log
