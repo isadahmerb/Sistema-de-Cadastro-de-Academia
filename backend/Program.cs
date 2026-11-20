@@ -161,7 +161,7 @@ app.MapPost("/login", (LoginRequest request) =>
 
     string token = RandomNumberGenerator.GetHexString(32, lowercase: true);
 
-    using SqliteCommand insert = new(
+        using SqliteCommand insert = new(
         @"INSERT INTO Current_sessions (session_token, last_used)
           VALUES ($token, CURRENT_TIMESTAMP)",
         sqlConnection);

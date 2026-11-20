@@ -7,8 +7,8 @@ rem Este script fica na mesma pasta do create_database.py.
 
 rem Caminhos do projeto
 set "DIR_SCRIPT=%~dp0"
-for %%I in ("%DIR_SCRIPT%..") do set "RAIZ_PROJETO=%%~fI"
-set "DIRETORIO_BANCO=%RAIZ_PROJETO%\Sistema-de-Cdastro-de-Academia\backend"
+set "RAIZ_PROJETO=%DIR_SCRIPT:~0,-1%"
+set "DIRETORIO_BANCO=%RAIZ_PROJETO%\backend"
 set "ARQUIVO_BANCO=%DIRETORIO_BANCO%\db.db"
 set "ARQUIVO_SQL=%TEMP%\init_db_%RANDOM%.sql"
 
