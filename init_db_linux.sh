@@ -20,10 +20,60 @@ if ! mkdir -p "$DIRETORIO_BANCO"; then
     exit 1
 fi
 
-if sqlite3 "$ARQUIVO_BANCO" <<'SQL'
+# ---------------------------------------------------------------------------
+# Etapa 1: tabelas
+# ---------------------------------------------------------------------------
+if ! sqlite3 "$ARQUIVO_BANCO" <<'SQL'
 .bail on
 -- Garante a integridade das chaves estrangeiras
 PRAGMA foreign_keys = ON;
+
+-- Catalogo de exercicios
+CREATE TABLE IF NOT EXISTS Exercicios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    descricao TEXT
+);
+
+-- Series de um exercicio (ex.: 3 sets x 12 repeticoes de supino)
+CREATE TABLE IF NOT EXISTS Sets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_exercicio INTEGER NOT NULL,
+    sets INTEGER NOT NULL,
+    repeticoes INTEGER NOT NULL,
+
+    FOREIGN KEY (id_exercicio)
+        REFERENCES Exercicios(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CHECK (sets > 0),
+    CHECK (repeticoes > 0)
+);
+
+-- Plano de treino (ficha). Os sets ficam na tabela de ligacao Treino_Sets.
+CREATE TABLE IF NOT EXISTS Treino (
+    id INTEGER PRIMARY KEY AUTOINCREMENT
+);
+
+-- Substitui a "lista_id_sets": uma linha por set dentro de um treino
+CREATE TABLE IF NOT EXISTS Treino_Sets (
+    id_treino INTEGER NOT NULL,
+    id_set INTEGER NOT NULL,
+    ordem INTEGER NOT NULL DEFAULT 0,
+
+    PRIMARY KEY (id_treino, id_set),
+
+    FOREIGN KEY (id_treino)
+        REFERENCES Treino(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (id_set)
+        REFERENCES Sets(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+);
 
 CREATE TABLE IF NOT EXISTS Membros (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,7 +81,10 @@ CREATE TABLE IF NOT EXISTS Membros (
     cpf TEXT NOT NULL UNIQUE,
     telefone TEXT,
     endereco TEXT,
-    data_cadastro TEXT NOT NULL
+    data_cadastro TEXT NOT NULL,
+    id_treino_a INTEGER REFERENCES Treino(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    id_treino_b INTEGER REFERENCES Treino(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    id_treino_c INTEGER REFERENCES Treino(id) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS Funcionarios (
@@ -122,6 +175,41 @@ CREATE TABLE IF NOT EXISTS Current_sessions (
     -- Token com exatamente 32 caracteres
     CHECK (length(session_token) = 32)
 );
+SQL
+then
+    echo "Erro ao criar as tabelas do banco de dados." >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Etapa 2: migracao para bancos que ja existiam sem as colunas de treino em Membros
+# (CREATE TABLE IF NOT EXISTS nao altera tabelas existentes)
+# ---------------------------------------------------------------------------
+for coluna in id_treino_a id_treino_b id_treino_c; do
+    existe=$(sqlite3 "$ARQUIVO_BANCO" \
+        "SELECT COUNT(*) FROM pragma_table_info('Membros') WHERE name = '$coluna';") || {
+        echo "Erro ao verificar a coluna $coluna." >&2
+        exit 1
+    }
+
+    if [ "$existe" = "0" ]; then
+        if ! sqlite3 "$ARQUIVO_BANCO" \
+            "PRAGMA foreign_keys = ON;
+             ALTER TABLE Membros ADD COLUMN $coluna INTEGER
+                 REFERENCES Treino(id) ON UPDATE CASCADE ON DELETE SET NULL;"; then
+            echo "Erro ao adicionar a coluna $coluna em Membros." >&2
+            exit 1
+        fi
+        echo "Coluna $coluna adicionada em Membros."
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# Etapa 3: indices
+# ---------------------------------------------------------------------------
+if sqlite3 "$ARQUIVO_BANCO" <<'SQL'
+.bail on
+PRAGMA foreign_keys = ON;
 
 -- Indices para consultas pelas chaves estrangeiras
 CREATE INDEX IF NOT EXISTS idx_treinos_membro
@@ -143,12 +231,27 @@ CREATE INDEX IF NOT EXISTS idx_historico_treino
     ON Historico_Atividades(id_treino);
 
 CREATE INDEX IF NOT EXISTS idx_current_sessions_last_used
-    ON current_sessions(last_used);
+    ON Current_sessions(last_used);
+
+CREATE INDEX IF NOT EXISTS idx_sets_exercicio
+    ON Sets(id_exercicio);
+
+CREATE INDEX IF NOT EXISTS idx_treino_sets_set
+    ON Treino_Sets(id_set);
+
+CREATE INDEX IF NOT EXISTS idx_membros_treino_a
+    ON Membros(id_treino_a);
+
+CREATE INDEX IF NOT EXISTS idx_membros_treino_b
+    ON Membros(id_treino_b);
+
+CREATE INDEX IF NOT EXISTS idx_membros_treino_c
+    ON Membros(id_treino_c);
 SQL
 then
     echo "Banco de dados criado/verificado com sucesso!"
     echo "Arquivo: $ARQUIVO_BANCO"
 else
-    echo "Erro ao criar o banco de dados." >&2
+    echo "Erro ao criar os indices do banco de dados." >&2
     exit 1
 fi
