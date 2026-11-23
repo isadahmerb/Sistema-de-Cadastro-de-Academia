@@ -256,11 +256,59 @@ app.MapDelete("/treinos/{id_treino}/set/{id_set}", (int id_treino, int id_set) =
         : Results.NoContent();
 }).WithName("removeSetFromTreino");
 
+app.MapPost("/sets", (CreateSetRequest req) =>
+{
+    if (req.sets <= 0 || req.repeticoes <= 0)
+        return Results.BadRequest("sets e repeticoes devem ser maiores que zero");
+
+    string query = @"INSERT INTO Sets (id_exercicio, sets, repeticoes)
+                     VALUES ($id_exercicio, $sets, $repeticoes);
+                     SELECT last_insert_rowid();";
+
+    using SqliteCommand command = new(query, sqlConnection);
+    command.Parameters.AddWithValue("$id_exercicio", req.id_exercicio);
+    command.Parameters.AddWithValue("$sets", req.sets);
+    command.Parameters.AddWithValue("$repeticoes", req.repeticoes);
+
+    try
+    {
+        long id = (long)command.ExecuteScalar()!;
+        return Results.Created($"/sets/{id}", new { id });
+    }
+    catch (SqliteException e) when (e.SqliteErrorCode == 19)
+    {
+        return Results.BadRequest($"O exercício {req.id_exercicio} não existe");
+    }
+}).WithName("addSet");
+
+app.MapPost("/treinos/{id_treino}/set/{id_set}", (int id_treino, int id_set) =>
+{
+    using SqliteCommand command = new(@"
+        INSERT INTO Treino_Sets (id_treino, id_set, ordem)
+        VALUES ($treino, $set,
+                (SELECT COALESCE(MAX(ordem), 0) + 1
+                 FROM Treino_Sets WHERE id_treino = $treino))",
+        sqlConnection);
+    command.Parameters.AddWithValue("$treino", id_treino);
+    command.Parameters.AddWithValue("$set", id_set);
+
+    try
+    {
+        command.ExecuteNonQuery();
+        return Results.NoContent();
+    }
+    catch (SqliteException e) when (e.SqliteErrorCode == 19)
+    {
+        return Results.Conflict("Esse set já está no treino, ou o treino/set não existe");
+    }
+}).WithName("addSetToTreino");
+
 app.Run();
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
 record CreateEmployeeRequest(string name, string role, string login, string password);
 record LoginRequest(string login, string password);
+record CreateSetRequest(int id_exercicio, int sets, int repeticoes);
 
 class Utils
 {
