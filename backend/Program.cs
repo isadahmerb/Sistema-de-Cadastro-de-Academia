@@ -179,11 +179,75 @@ app.MapPost("/login", (LoginRequest request) =>
     return Results.Ok(new { token });
 }).WithName("login");
 
+app.MapGet("/treinos/{id}", (int id) =>
+{
+    // Busca as 3 fichas (A, B, C) do membro
+    long?[] fichas = new long?[3];
+
+    using (SqliteCommand command = new(
+               "SELECT id_treino_a, id_treino_b, id_treino_c FROM Membros WHERE id = @id",
+               sqlConnection))
+    {
+        command.Parameters.AddWithValue("@id", id);
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return Results.NotFound();
+
+        for (int i = 0; i < 3; i++)
+            fichas[i] = reader.IsDBNull(i) ? null : reader.GetInt64(i);
+    }
+
+    // Para cada ficha, busca os exercicios com seus sets
+    var treinos = new List<object>();
+
+    foreach (long? ficha in fichas)
+    {
+        var exercicios = new List<object>();
+
+        if (ficha is not null)
+        {
+            using SqliteCommand command = new(@"
+                SELECT ts.id_treino, ts.id_set, e.nome, e.descricao, s.sets, s.repeticoes
+                FROM Treino_Sets ts
+                JOIN Sets s ON s.id = ts.id_set
+                JOIN Exercicios e ON e.id = s.id_exercicio
+                WHERE ts.id_treino = @treino
+                ORDER BY ts.ordem, ts.id_set",
+                sqlConnection);
+            command.Parameters.AddWithValue("@treino", ficha.Value);
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                exercicios.Add(new
+                {
+                    id_treino = reader.GetInt64(0),
+                    id_set = reader.GetInt64(1),
+                    nome = reader.GetString(2),
+                    descricao = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    sets = new
+                    {
+                        sets = reader.GetInt64(4),
+                        repeticoes = reader.GetInt64(5)
+                    }
+                });
+            }
+        }
+
+        treinos.Add(new { exercicios });
+    }
+
+    return Results.Ok(new { treinos });
+}).WithName("getTreinos");
+
 app.Run();
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
 record CreateEmployeeRequest(string name, string role, string login, string password);
 record LoginRequest(string login, string password);
+
+record TreinosRequest(int membro_id);
 
 class Utils
 {
