@@ -241,13 +241,26 @@ app.MapGet("/treinos/{id}", (int id) =>
     return Results.Ok(new { treinos });
 }).WithName("getTreinos");
 
+app.MapDelete("/treinos/{id_treino}/set/{id_set}", (int id_treino, int id_set) =>
+{
+    using SqliteCommand command = new(
+        "DELETE FROM Treino_Sets WHERE id_treino = @treino AND id_set = @set",
+        sqlConnection);
+    command.Parameters.AddWithValue("@treino", id_treino);
+    command.Parameters.AddWithValue("@set", id_set);
+
+    int linhas = command.ExecuteNonQuery();
+
+    return linhas == 0
+        ? Results.NotFound($"O set {id_set} não pertence ao treino {id_treino}")
+        : Results.NoContent();
+}).WithName("removeSetFromTreino");
+
 app.Run();
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
 record CreateEmployeeRequest(string name, string role, string login, string password);
 record LoginRequest(string login, string password);
-
-record TreinosRequest(int membro_id);
 
 class Utils
 {
