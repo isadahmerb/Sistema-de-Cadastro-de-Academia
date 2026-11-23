@@ -83,22 +83,40 @@ app.MapPost("/clientes", (CreateClientRequest new_client) =>
 
     if (Utils.GetAmountOfMembrosWithCPF(new_client.cpf, sqlConnection) > 0)
         return Results.Conflict($"O CPF {new_client.cpf} já é usado por outro cliente");
-    
-    string query = @"INSERT INTO Membros (Nome, Cpf, Telefone, Endereco, data_cadastro)
-                 VALUES ($nome, $cpf, $telefone, $endereco, $data);
-                 SELECT last_insert_rowid();";
 
-    using SqliteCommand command = new(query, sqlConnection);
-    command.Parameters.AddWithValue("$nome", new_client.name);
-    command.Parameters.AddWithValue("$cpf", new_client.cpf);
-    command.Parameters.AddWithValue("$telefone", new_client.telefone);
-    command.Parameters.AddWithValue("$endereco", new_client.address);
-    command.Parameters.AddWithValue("$data", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+    // Sem Commit(), o Dispose faz rollback automático
+    using var tx = sqlConnection.BeginTransaction();
 
-    long id = (long)command.ExecuteScalar()!;
-    return Results.Created($"/clientes/{id}", new { id });
-    
-    // return "Adding client: " + new_client.name + " " + new_client.cpf + " " + new_client.telefone + " " + new_client.address;
+    try
+    {
+        long fichaA = Utils.CriarFicha(sqlConnection, tx);
+        long fichaB = Utils.CriarFicha(sqlConnection, tx);
+        long fichaC = Utils.CriarFicha(sqlConnection, tx);
+
+        string query = @"INSERT INTO Membros (Nome, Cpf, Telefone, Endereco, data_cadastro,
+                                              id_treino_a, id_treino_b, id_treino_c)
+                         VALUES ($nome, $cpf, $telefone, $endereco, $data, $a, $b, $c);
+                         SELECT last_insert_rowid();";
+
+        using SqliteCommand command = new(query, sqlConnection, tx);
+        command.Parameters.AddWithValue("$nome", new_client.name);
+        command.Parameters.AddWithValue("$cpf", new_client.cpf);
+        command.Parameters.AddWithValue("$telefone", new_client.telefone);
+        command.Parameters.AddWithValue("$endereco", new_client.address);
+        command.Parameters.AddWithValue("$data", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        command.Parameters.AddWithValue("$a", fichaA);
+        command.Parameters.AddWithValue("$b", fichaB);
+        command.Parameters.AddWithValue("$c", fichaC);
+
+        long id = (long)command.ExecuteScalar()!;
+        tx.Commit();
+
+        return Results.Created($"/clientes/{id}", new { id, id_treino_a = fichaA, id_treino_b = fichaB, id_treino_c = fichaC });
+    }
+    catch (SqliteException e) when (e.SqliteErrorCode == 19)
+    {
+        return Results.Conflict($"O CPF {new_client.cpf} já é usado por outro cliente");
+    }
 }).WithName("addClient");
 
 app.MapPost("/employee", (CreateEmployeeRequest new_employee) =>
@@ -320,4 +338,11 @@ class Utils
 
         return (long)command.ExecuteScalar()!;
     }    
+    public static long CriarFicha(SqliteConnection conn, SqliteTransaction tx)
+    {
+        using var cmd = new SqliteCommand(
+            "INSERT INTO Treino DEFAULT VALUES; SELECT last_insert_rowid();",
+            conn, tx);
+        return (long)cmd.ExecuteScalar()!;
+    }
 }
