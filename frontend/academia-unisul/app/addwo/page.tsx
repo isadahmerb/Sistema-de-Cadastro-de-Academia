@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from 'next/link';
 
 type Exercicio = { id: number; nome: string };
 type ItemTreino = { id: number; repeticoes: string; series: string; obs: string };
@@ -80,6 +81,7 @@ export default function EditarTreinoPage() {
   return (
     <main style={{ margin: "10vh auto" }}>
       <header className="text-center">
+        <Link href="/home" className="fixed top-4 left-4 z-50">Voltar</Link>
         <h1 className="text-2xl font-bold">ACADEMIA UNISUL</h1>
         <p className="font-bold">Perfil ADM</p>
       </header>

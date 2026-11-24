@@ -1,0 +1,2 @@
+Essa pasta é pra criar um app pro membro usar, poder visualizar seus treinos e imprimi-los. 
+    Fazer separado do acesso de ADM para nao colidir informações e garantir maior segurança.

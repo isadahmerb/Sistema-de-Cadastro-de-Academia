@@ -1,18 +1,47 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { SyntheticEvent } from "react";
-
-
+import { useState, type SyntheticEvent } from "react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [erro, setErro] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
-  // TODO: tem q colocar verificacao no backend
-
-  function handleSubmit(e: SyntheticEvent<HTMLFormElement>) {
+  async function handleSubmit(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
-    router.push("/home");
+    setErro("");
+    setEnviando(true);
+
+    const dados = new FormData(e.currentTarget);
+
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          login: dados.get("codigo"),
+          password: dados.get("password"),
+        }),
+      });
+
+      if (res.status === 401) {
+        setErro("Login ou senha inválidos");
+        return;
+      }
+      if (!res.ok) {
+        setErro("Não foi possível entrar. Tente de novo");
+        return;
+      }
+
+      const { token } = await res.json();
+      localStorage.setItem("token", token);
+      router.push("/home");
+    } catch {
+      setErro("Não foi possível conectar ao servidor");
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return (
@@ -26,7 +55,10 @@ export default function LoginPage() {
         <input name="codigo" type="text" placeholder="abc123" required />
         <p>Senha de Admin</p>
         <input name="password" type="password" placeholder="******" required />
-        <button type="submit">Entrar</button>
+        {erro && <p className="text-sm font-bold text-red-600">{erro}</p>}
+        <button type="submit" disabled={enviando}>
+          {enviando ? "Entrando..." : "Entrar"}
+        </button>
       </form>
     </main>
   );

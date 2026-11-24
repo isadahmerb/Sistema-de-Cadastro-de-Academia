@@ -1,73 +1,101 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ListCard, { type ListItem } from "../components/ListCard";
-import BoxTreino, { type Aluno } from "../components/BoxTreino";
+import BoxTreino, { type Aluno, type Treino } from "../components/BoxTreino";
 
-const alunos: Aluno[] = [
-    {
-        id: 1,
-        nome: "Maria Silva",
-        matricula: "1203",
-        treinos: [
-            { id: "A", nome: "Treino A", exercicios: ["Supino reto", "Crucifixo", "Tríceps testa", "Tríceps corda"] },
-            { id: "B", nome: "Treino B", exercicios: ["Puxada frontal", "Remada baixa", "Rosca direta", "Rosca martelo"] },
-            { id: "C", nome: "Treino C", exercicios: ["Agachamento", "Leg press", "Cadeira extensora", "Panturrilha"] },
-        ],
-        pagamentos: [
-            { id: 1, referencia: "Outubro 2026", vencimento: "15/10/2026", valor: 100, status: "Aberto" },
-            { id: 2, referencia: "Setembro 2026", vencimento: "15/09/2026", valor: 100, status: "Pago" },
-        ],
-        historico: [
-            { id: 1, treino: "Treino A", data: "08/10/2026", hora: "14:30h" },
-            { id: 2, treino: "Treino C", data: "06/10/2026", hora: "14:30h" },
-            { id: 3, treino: "Treino B", data: "05/10/2026", hora: "14:30h" },
-        ],
-    },
-    {
-        id: 2,
-        nome: "João Souza",
-        matricula: "1204",
-        treinos: [
-            { id: "A", nome: "Treino A", exercicios: ["Desenvolvimento", "Elevação lateral", "Remada alta"] },
-            { id: "B", nome: "Treino B", exercicios: ["Barra fixa", "Remada curvada", "Rosca alternada"] },
-        ],
-        pagamentos: [
-            { id: 1, referencia: "Outubro 2026", vencimento: "10/10/2026", valor: 120, status: "Pago" },
-            { id: 2, referencia: "Novembro 2026", vencimento: "10/11/2026", valor: 120, status: "Pago" },
-        ],
-        historico: [{ id: 1, treino: "Treino A", data: "07/10/2026", hora: "18:00h" }],
-    },
-    {
-        id: 3,
-        nome: "Leonardo",
-        matricula: "1205",
-        treinos: [
-            { id: "A", nome: "Treino A", exercicios: ["Desenvolvimento", "Elevação lateral", "Remada alta"] },
-            { id: "B", nome: "Treino B", exercicios: ["Barra fixa", "Remada curvada", "Rosca alternada"] },
-            { id: "C", nome: "Treino C", exercicios: ["Agachamento", "Leg press", "Cadeira extensora", "Panturrilha"] },
-        ],
-        pagamentos: [
-            { id: 1, referencia: "Outubro 2026", vencimento: "10/10/2026", valor: 100, status: "Pago" },
-            { id: 2, referencia: "Novembro 2026", vencimento: "10/11/2026", valor: 100, status: "Aberto" },
-        ],
-        historico: [
-            { id: 1, treino: "Treino C", data: "08/10/2026", hora: "18:00h" },
-            { id: 2, treino: "Treino B", data: "06/10/2026", hora: "16:30h" },
-            { id: 3, treino: "Treino A", data: "05/10/2026", hora: "11:30h" },
-        ],
-    },
-];
+type Membro = { id: number; nome: string };
+type TreinoApi = {
+    exercicios: {
+        id_treino: number;
+        id_set: number;
+        nome: string;
+        sets: { sets: number; repeticoes: number };
+    }[];
+};
 
-const itens: ListItem[] = alunos.map((a) => ({
-    id: a.id,
-    titulo: a.nome,
-    detalhe: a.matricula,
-}));
+
+const campo = (o: Record<string, unknown>, nome: string) =>
+    o[Object.keys(o).find((k) => k.toLowerCase() === nome) ?? ""];
 
 export default function HomePage() {
+    const [membros, setMembros] = useState<Membro[]>([]);
     const [alunoId, setAlunoId] = useState<number | null>(null);
-    const aluno = alunos.find((a) => a.id === alunoId) ?? null;
+    const [detalhe, setDetalhe] = useState<{ id: number; treinos: Treino[] } | null>(null);
+    const [carregando, setCarregando] = useState(true);
+    const [erro, setErro] = useState("");
+
+    // lista de alunos
+    useEffect(() => {
+        fetch("/api/clientes")
+            .then((r) => {
+                if (!r.ok) throw new Error();
+                return r.json();
+            })
+            .then((lista: Record<string, unknown>[]) =>
+                setMembros(
+                    lista.map((m) => ({
+                        id: Number(campo(m, "id")),
+                        nome: String(campo(m, "nome")),
+                    }))
+                )
+            )
+            .catch(() => setErro("Não foi possível carregar os alunos."))
+            .finally(() => setCarregando(false));
+    }, []);
+
+    // treinos do aluno selecionado
+    useEffect(() => {
+        if (alunoId === null) return;
+        let cancelado = false;
+
+        fetch(`/api/treinos/${alunoId}`)
+            .then((r) => {
+                if (!r.ok) throw new Error();
+                return r.json();
+            })
+            .then((d: { treinos: TreinoApi[] }) => {
+                if (cancelado) return;
+                setDetalhe({
+                    id: alunoId,
+                    treinos: d.treinos.map((t, i) => ({
+                        id: "ABC"[i],
+                        nome: `Treino ${"ABC"[i]}`,
+                        exercicios: t.exercicios.map((e) => ({
+                            idSet: e.id_set,
+                            idTreino: e.id_treino,
+                            nome: e.nome,
+                            series: e.sets.sets,
+                            repeticoes: e.sets.repeticoes,
+                        })),
+                    })),
+                });
+            })
+            .catch(() => !cancelado && setDetalhe({ id: alunoId, treinos: [] }));
+
+        return () => {
+            cancelado = true;
+        };
+    }, [alunoId]);
+
+    const itens: ListItem[] = membros.map((m) => ({
+        id: m.id,
+        titulo: m.nome,
+        detalhe: String(m.id),
+    }));
+
+    const membro = membros.find((m) => m.id === alunoId);
+    const aluno: Aluno | null = membro
+        ? {
+              id: membro.id,
+              nome: membro.nome,
+              matricula: String(membro.id),
+              treinos: detalhe?.id === membro.id ? detalhe.treinos : [],
+              pagamentos: [], // backend  não tem
+              historico: [], // backend não tem
+          }
+        : null;
+
     return (
         <main style={{ margin: "10vh auto" }}>
             <header className="main-header">
@@ -75,18 +103,21 @@ export default function HomePage() {
                 <p>Perfil ADM</p>
             </header>
 
-            <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2">
-                <ListCard
-                    title="Lista de membros"
-                    items={itens}
-                    actionLabel="Cadastrar membro"
-                    actionHref="/register"
-                    onSelect={(item) => setAlunoId(Number(item.id))}
-                />
-                <BoxTreino aluno={aluno} />
-            </div>
+            {erro && <p className="mt-6 text-center font-bold text-red-600">{erro}</p>}
+            {carregando && <p className="mt-6 text-center">Carregando...</p>}
 
-
+            {!carregando && !erro && (
+                <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2">
+                    <ListCard
+                        title="Lista de alunos"
+                        items={itens}
+                        actionLabel="Cadastrar aluno"
+                        actionHref="/register"
+                        onSelect={(item) => setAlunoId(Number(item.id))}
+                    />
+                    <BoxTreino aluno={aluno} />
+                </div>
+            )}
         </main>
     );
 }

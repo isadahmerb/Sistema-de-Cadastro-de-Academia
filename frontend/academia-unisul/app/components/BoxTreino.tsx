@@ -3,7 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 
-export type Treino = { id: string; nome: string; exercicios: string[] };
+export type ExercicioDoTreino = {
+  idSet: number;
+  idTreino: number;
+  nome: string;
+  series: number;
+  repeticoes: number;
+};
+export type Treino = { id: string; nome: string; exercicios: ExercicioDoTreino[] };
 
 export type Pagamento = {
   id: number;
@@ -98,7 +105,12 @@ export default function BoxTreino({ aluno }: { aluno: Aluno | null }) {
                     <div className="bg-white p-2">
                       <ul className="pl-10">
                         {t.exercicios.map((ex) => (
-                          <li key={ex}>{ex}</li>
+                          <li key={ex.idSet}>
+                            {ex.nome}
+                            <span className="ml-2 text-xs text-gray-600">
+                              {ex.series}x {ex.repeticoes}
+                            </span>
+                          </li>
                         ))}
                       </ul>
                       <button
