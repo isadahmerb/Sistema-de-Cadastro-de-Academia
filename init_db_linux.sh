@@ -168,6 +168,13 @@ CREATE TABLE IF NOT EXISTS Historico_Atividades (
     )
 );
 
+-- Validade da assinatura de cada membro (uma linha por membro)
+CREATE TABLE IF NOT EXISTS Validade_Assinaturas (
+    id_membro INTEGER PRIMARY KEY
+        REFERENCES Membros(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    data_final TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS Current_sessions (
     session_token TEXT NOT NULL PRIMARY KEY,
     last_used TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
