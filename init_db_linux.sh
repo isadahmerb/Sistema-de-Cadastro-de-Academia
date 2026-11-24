@@ -175,6 +175,24 @@ CREATE TABLE IF NOT EXISTS Validade_Assinaturas (
     data_final TEXT NOT NULL
 );
 
+-- Dias em que um membro realizou uma ficha de treino (A, B ou C)
+CREATE TABLE IF NOT EXISTS Historico_Treinos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_membro INTEGER NOT NULL,
+    id_treino INTEGER NOT NULL,
+    dia TEXT NOT NULL,
+
+    FOREIGN KEY (id_membro)
+        REFERENCES Membros(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (id_treino)
+        REFERENCES Treino(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+);
+
 CREATE TABLE IF NOT EXISTS Current_sessions (
     session_token TEXT NOT NULL PRIMARY KEY,
     last_used TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -236,6 +254,12 @@ CREATE INDEX IF NOT EXISTS idx_historico_funcionario
 
 CREATE INDEX IF NOT EXISTS idx_historico_treino
     ON Historico_Atividades(id_treino);
+
+CREATE INDEX IF NOT EXISTS idx_historico_treinos_membro_dia
+    ON Historico_Treinos(id_membro, dia);
+
+CREATE INDEX IF NOT EXISTS idx_historico_treinos_treino
+    ON Historico_Treinos(id_treino);
 
 CREATE INDEX IF NOT EXISTS idx_current_sessions_last_used
     ON Current_sessions(last_used);
