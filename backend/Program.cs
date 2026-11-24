@@ -417,6 +417,158 @@ app.MapDelete("/exercicios/{id}", (int id) =>
         : Results.NoContent();
 }).WithName("removeExercicio");
 
+app.MapGet("/pagamentos", () =>
+{
+    using SqliteCommand command = new(@"
+        SELECT id, id_membro, id_funcionario, valor, data_pagamento, status
+        FROM Pagamentos
+        ORDER BY data_pagamento DESC, id DESC",
+        sqlConnection);
+
+    using var reader = command.ExecuteReader();
+
+    var pagamentos = new List<object>();
+    while (reader.Read())
+        pagamentos.Add(Utils.LerPagamento(reader));
+
+    return Results.Ok(pagamentos);
+}).WithName("getPagamentos");
+
+app.MapGet("/pagamentos/{id_cliente}", (int id_cliente) =>
+{
+    if (Utils.GetAmountOfMembrosWithId(id_cliente, sqlConnection) == 0)
+        return Results.NotFound($"O cliente {id_cliente} não existe");
+
+    using SqliteCommand command = new(@"
+        SELECT id, id_membro, id_funcionario, valor, data_pagamento, status
+        FROM Pagamentos
+        WHERE id_membro = $id
+        ORDER BY data_pagamento DESC, id DESC",
+        sqlConnection);
+    command.Parameters.AddWithValue("$id", id_cliente);
+
+    using var reader = command.ExecuteReader();
+
+    var pagamentos = new List<object>();
+    while (reader.Read())
+        pagamentos.Add(Utils.LerPagamento(reader));
+
+    return Results.Ok(pagamentos);
+}).WithName("getPagamentosCliente");
+
+app.MapPost("/pagamentos", (CreatePaymentRequest req) =>
+{
+    if (req.valor < 0)
+        return Results.BadRequest("O valor não pode ser negativo");
+
+    if (string.IsNullOrWhiteSpace(req.status))
+        return Results.BadRequest("Informe o status do pagamento");
+
+    if (Utils.GetAmountOfMembrosWithId(req.id_membro, sqlConnection) == 0)
+        return Results.NotFound($"O cliente {req.id_membro} não existe");
+
+    if (Utils.GetAmountOfFuncionariosWithId(req.id_funcionario, sqlConnection) == 0)
+        return Results.NotFound($"O funcionário {req.id_funcionario} não existe");
+
+    using SqliteCommand command = new(@"
+        INSERT INTO Pagamentos (id_membro, id_funcionario, valor, data_pagamento, status)
+        VALUES ($membro, $funcionario, $valor, $data, $status);
+        SELECT last_insert_rowid();",
+        sqlConnection);
+    command.Parameters.AddWithValue("$membro", req.id_membro);
+    command.Parameters.AddWithValue("$funcionario", req.id_funcionario);
+    command.Parameters.AddWithValue("$valor", req.valor);
+    command.Parameters.AddWithValue("$data", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+    command.Parameters.AddWithValue("$status", req.status);
+
+    long id = (long)command.ExecuteScalar()!;
+    return Results.Created($"/pagamentos/{req.id_membro}", new { id });
+}).WithName("addPagamento");
+
+app.MapGet("/assinaturas", () =>
+{
+    using SqliteCommand command = new(
+        "SELECT id_membro, data_final FROM Validade_Assinaturas ORDER BY data_final",
+        sqlConnection);
+
+    using var reader = command.ExecuteReader();
+
+    var assinaturas = new List<object>();
+    while (reader.Read())
+        assinaturas.Add(Utils.LerAssinatura(reader));
+
+    return Results.Ok(assinaturas);
+}).WithName("getAssinaturas");
+
+app.MapGet("/assinaturas/{id_membro}", (int id_membro) =>
+{
+    using SqliteCommand command = new(
+        "SELECT id_membro, data_final FROM Validade_Assinaturas WHERE id_membro = $id",
+        sqlConnection);
+    command.Parameters.AddWithValue("$id", id_membro);
+
+    using var reader = command.ExecuteReader();
+
+    if (!reader.Read())
+        return Results.NotFound($"O cliente {id_membro} não tem assinatura cadastrada");
+
+    return Results.Ok(Utils.LerAssinatura(reader));
+}).WithName("getAssinatura");
+
+app.MapPost("/assinaturas", (CreateSubscriptionRequest req) =>
+{
+    if (!Utils.TryParseData(req.data_final, out DateOnly dataFinal))
+        return Results.BadRequest("data_final deve estar no formato yyyy-MM-dd");
+
+    if (Utils.GetAmountOfMembrosWithId(req.id_membro, sqlConnection) == 0)
+        return Results.NotFound($"O cliente {req.id_membro} não existe");
+
+    using SqliteCommand command = new(
+        "INSERT INTO Validade_Assinaturas (id_membro, data_final) VALUES ($id, $data)",
+        sqlConnection);
+    command.Parameters.AddWithValue("$id", req.id_membro);
+    command.Parameters.AddWithValue("$data", dataFinal.ToString("yyyy-MM-dd"));
+
+    try
+    {
+        command.ExecuteNonQuery();
+        return Results.Created($"/assinaturas/{req.id_membro}", new { id_membro = req.id_membro });
+    }
+    catch (SqliteException e) when (e.SqliteErrorCode == 19)
+    {
+        // PRIMARY KEY duplicada: o cliente já tem assinatura
+        return Results.Conflict($"O cliente {req.id_membro} já tem assinatura. Use PUT para alterar a validade");
+    }
+}).WithName("addAssinatura");
+
+app.MapPut("/assinaturas/{id_membro}", (int id_membro, UpdateSubscriptionRequest req) =>
+{
+    if (!Utils.TryParseData(req.data_final, out DateOnly dataFinal))
+        return Results.BadRequest("data_final deve estar no formato yyyy-MM-dd");
+
+    using SqliteCommand command = new(
+        "UPDATE Validade_Assinaturas SET data_final = $data WHERE id_membro = $id",
+        sqlConnection);
+    command.Parameters.AddWithValue("$id", id_membro);
+    command.Parameters.AddWithValue("$data", dataFinal.ToString("yyyy-MM-dd"));
+
+    return command.ExecuteNonQuery() == 0
+        ? Results.NotFound($"O cliente {id_membro} não tem assinatura cadastrada")
+        : Results.NoContent();
+}).WithName("updateAssinatura");
+
+app.MapDelete("/assinaturas/{id_membro}", (int id_membro) =>
+{
+    using SqliteCommand command = new(
+        "DELETE FROM Validade_Assinaturas WHERE id_membro = $id",
+        sqlConnection);
+    command.Parameters.AddWithValue("$id", id_membro);
+
+    return command.ExecuteNonQuery() == 0
+        ? Results.NotFound($"O cliente {id_membro} não tem assinatura cadastrada")
+        : Results.NoContent();
+}).WithName("removeAssinatura");
+
 app.Run();
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
@@ -425,6 +577,9 @@ record LoginRequest(string login, string password);
 record CreateSetRequest(int id_exercicio, int sets, int repeticoes);
 record CreateExerciseRequest(string nome, string? descricao);
 record UpdateExerciseRequest(string nome, string? descricao);
+record CreatePaymentRequest(int id_membro, int id_funcionario, decimal valor, string status);
+record CreateSubscriptionRequest(int id_membro, string data_final);
+record UpdateSubscriptionRequest(string data_final);
 
 class Utils
 {
@@ -442,5 +597,46 @@ class Utils
             "INSERT INTO Treino DEFAULT VALUES; SELECT last_insert_rowid();",
             conn, tx);
         return (long)cmd.ExecuteScalar()!;
+    }
+    public static long GetAmountOfMembrosWithId(int id, SqliteConnection sqlConnection)
+    {
+        using var command = sqlConnection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM Membros WHERE id = $id";
+        command.Parameters.AddWithValue("$id", id);
+        return (long)command.ExecuteScalar()!;
+    }
+
+    public static long GetAmountOfFuncionariosWithId(int id, SqliteConnection sqlConnection)
+    {
+        using var command = sqlConnection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM Funcionarios WHERE id = $id";
+        command.Parameters.AddWithValue("$id", id);
+        return (long)command.ExecuteScalar()!;
+    }
+
+    public static object LerPagamento(SqliteDataReader reader) => new
+    {
+        id = reader.GetInt64(0),
+        id_membro = reader.GetInt64(1),
+        id_funcionario = reader.GetInt64(2),
+        valor = reader.GetValue(3),
+        data_pagamento = reader.GetString(4),
+        status = reader.GetString(5)
+    };
+    public static bool TryParseData(string? texto, out DateOnly data) =>
+        DateOnly.TryParseExact(texto, "yyyy-MM-dd",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out data);
+
+    public static object LerAssinatura(SqliteDataReader reader)
+    {
+        string dataFinal = reader.GetString(1);
+        return new
+        {
+            id_membro = reader.GetInt64(0),
+            data_final = dataFinal,
+            // yyyy-MM-dd compara corretamente como texto; vale até o fim do dia data_final
+            ativa = string.CompareOrdinal(dataFinal, DateTime.Now.ToString("yyyy-MM-dd")) >= 0
+        };
     }
 }
