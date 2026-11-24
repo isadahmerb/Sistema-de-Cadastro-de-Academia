@@ -363,12 +363,68 @@ app.MapGet("/exercicios/{id}", (int id) =>
     });
 }).WithName("getExercicio");
 
+app.MapPost("/exercicios", (CreateExerciseRequest req) =>
+{
+    if (string.IsNullOrWhiteSpace(req.nome))
+        return Results.BadRequest("Informe o nome do exercício");
+
+    using SqliteCommand command = new(@"
+        INSERT INTO Exercicios (nome, descricao)
+        VALUES ($nome, $descricao);
+        SELECT last_insert_rowid();",
+        sqlConnection);
+    command.Parameters.AddWithValue("$nome", req.nome);
+    command.Parameters.AddWithValue("$descricao", (object?)req.descricao ?? DBNull.Value);
+
+    long id = (long)command.ExecuteScalar()!;
+    return Results.Created($"/exercicios/{id}", new { id });
+}).WithName("addExercicio");
+
+app.MapPut("/exercicios/{id}", (int id, UpdateExerciseRequest req) =>
+{
+    if (string.IsNullOrWhiteSpace(req.nome))
+        return Results.BadRequest("Informe o nome do exercício");
+
+    using SqliteCommand command = new(@"
+        UPDATE Exercicios SET nome = $nome, descricao = $descricao
+        WHERE id = $id",
+        sqlConnection);
+    command.Parameters.AddWithValue("$id", id);
+    command.Parameters.AddWithValue("$nome", req.nome);
+    command.Parameters.AddWithValue("$descricao", (object?)req.descricao ?? DBNull.Value);
+
+    return command.ExecuteNonQuery() == 0
+        ? Results.NotFound()
+        : Results.NoContent();
+}).WithName("updateExercicio");
+
+app.MapDelete("/exercicios/{id}", (int id) =>
+{
+    // Checagem manual: não depende de Foreign Keys=True na connection string
+    using (SqliteCommand check = new(
+               "SELECT COUNT(*) FROM Sets WHERE id_exercicio = $id", sqlConnection))
+    {
+        check.Parameters.AddWithValue("$id", id);
+        if ((long)check.ExecuteScalar()! > 0)
+            return Results.Conflict("Esse exercício é usado por um ou mais sets e não pode ser removido");
+    }
+
+    using SqliteCommand command = new("DELETE FROM Exercicios WHERE id = $id", sqlConnection);
+    command.Parameters.AddWithValue("$id", id);
+
+    return command.ExecuteNonQuery() == 0
+        ? Results.NotFound()
+        : Results.NoContent();
+}).WithName("removeExercicio");
+
 app.Run();
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
 record CreateEmployeeRequest(string name, string role, string login, string password);
 record LoginRequest(string login, string password);
 record CreateSetRequest(int id_exercicio, int sets, int repeticoes);
+record CreateExerciseRequest(string nome, string? descricao);
+record UpdateExerciseRequest(string nome, string? descricao);
 
 class Utils
 {
