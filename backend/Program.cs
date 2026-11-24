@@ -321,6 +321,48 @@ app.MapPost("/treinos/{id_treino}/set/{id_set}", (int id_treino, int id_set) =>
     }
 }).WithName("addSetToTreino");
 
+app.MapGet("/exercicios", () =>
+{
+    using SqliteCommand command = new(
+        "SELECT id, nome, descricao FROM Exercicios ORDER BY nome",
+        sqlConnection);
+
+    using var reader = command.ExecuteReader();
+
+    var exercicios = new List<object>();
+    while (reader.Read())
+    {
+        exercicios.Add(new
+        {
+            id = reader.GetInt64(0),
+            nome = reader.GetString(1),
+            descricao = reader.IsDBNull(2) ? null : reader.GetString(2)
+        });
+    }
+
+    return Results.Ok(exercicios);
+}).WithName("getExercicios");
+
+app.MapGet("/exercicios/{id}", (int id) =>
+{
+    using SqliteCommand command = new(
+        "SELECT id, nome, descricao FROM Exercicios WHERE id = @id",
+        sqlConnection);
+    command.Parameters.AddWithValue("@id", id);
+
+    using var reader = command.ExecuteReader();
+
+    if (!reader.Read())
+        return Results.NotFound();
+
+    return Results.Ok(new
+    {
+        id = reader.GetInt64(0),
+        nome = reader.GetString(1),
+        descricao = reader.IsDBNull(2) ? null : reader.GetString(2)
+    });
+}).WithName("getExercicio");
+
 app.Run();
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
