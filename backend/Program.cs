@@ -568,6 +568,107 @@ app.MapDelete("/assinaturas/{id_membro}", (int id_membro) =>
         ? Results.NotFound($"O cliente {id_membro} não tem assinatura cadastrada")
         : Results.NoContent();
 }).WithName("removeAssinatura");
+app.MapGet("/historico-treinos", (int? id_membro) =>
+{
+    using SqliteCommand command = new(@"
+        SELECT id, id_membro, id_treino, dia
+        FROM Historico_Treinos
+        WHERE $membro IS NULL OR id_membro = $membro
+        ORDER BY dia DESC, id DESC",
+        sqlConnection);
+    command.Parameters.AddWithValue("$membro", (object?)id_membro ?? DBNull.Value);
+
+    using var reader = command.ExecuteReader();
+
+    var registros = new List<object>();
+    while (reader.Read())
+        registros.Add(Utils.LerHistoricoTreino(reader));
+
+    return Results.Ok(registros);
+}).WithName("getHistoricoTreinos");
+
+app.MapGet("/historico-treinos/{id}", (int id) =>
+{
+    using SqliteCommand command = new(
+        "SELECT id, id_membro, id_treino, dia FROM Historico_Treinos WHERE id = $id",
+        sqlConnection);
+    command.Parameters.AddWithValue("$id", id);
+
+    using var reader = command.ExecuteReader();
+
+    if (!reader.Read())
+        return Results.NotFound();
+
+    return Results.Ok(Utils.LerHistoricoTreino(reader));
+}).WithName("getHistoricoTreino");
+
+app.MapPost("/historico-treinos", (CreateTrainingLogRequest req) =>
+{
+    // Se o dia não for informado, usa hoje
+    string diaTexto = req.dia ?? DateTime.Now.ToString("yyyy-MM-dd");
+    if (!Utils.TryParseData(diaTexto, out DateOnly dia))
+        return Results.BadRequest("dia deve estar no formato yyyy-MM-dd");
+
+    if (Utils.GetAmountOfMembrosWithId(req.id_membro, sqlConnection) == 0)
+        return Results.NotFound($"O cliente {req.id_membro} não existe");
+
+    if (!Utils.FichaPertenceAoMembro(req.id_membro, req.id_treino, sqlConnection))
+        return Results.BadRequest($"O treino {req.id_treino} não é uma ficha do cliente {req.id_membro}");
+
+    using SqliteCommand command = new(@"
+        INSERT INTO Historico_Treinos (id_membro, id_treino, dia)
+        VALUES ($membro, $treino, $dia);
+        SELECT last_insert_rowid();",
+        sqlConnection);
+    command.Parameters.AddWithValue("$membro", req.id_membro);
+    command.Parameters.AddWithValue("$treino", req.id_treino);
+    command.Parameters.AddWithValue("$dia", dia.ToString("yyyy-MM-dd"));
+
+    long id = (long)command.ExecuteScalar()!;
+    return Results.Created($"/historico-treinos/{id}", new { id });
+}).WithName("addHistoricoTreino");
+
+app.MapPut("/historico-treinos/{id}", (int id, UpdateTrainingLogRequest req) =>
+{
+    if (!Utils.TryParseData(req.dia, out DateOnly dia))
+        return Results.BadRequest("dia deve estar no formato yyyy-MM-dd");
+
+    // Descobre o membro dono do registro (também confirma que ele existe)
+    long idMembro;
+    using (SqliteCommand select = new(
+               "SELECT id_membro FROM Historico_Treinos WHERE id = $id", sqlConnection))
+    {
+        select.Parameters.AddWithValue("$id", id);
+        object? result = select.ExecuteScalar();
+        if (result is null)
+            return Results.NotFound();
+        idMembro = (long)result;
+    }
+
+    if (!Utils.FichaPertenceAoMembro(idMembro, req.id_treino, sqlConnection))
+        return Results.BadRequest($"O treino {req.id_treino} não é uma ficha do cliente {idMembro}");
+
+    using SqliteCommand command = new(
+        "UPDATE Historico_Treinos SET id_treino = $treino, dia = $dia WHERE id = $id",
+        sqlConnection);
+    command.Parameters.AddWithValue("$id", id);
+    command.Parameters.AddWithValue("$treino", req.id_treino);
+    command.Parameters.AddWithValue("$dia", dia.ToString("yyyy-MM-dd"));
+    command.ExecuteNonQuery();
+
+    return Results.NoContent();
+}).WithName("updateHistoricoTreino");
+
+app.MapDelete("/historico-treinos/{id}", (int id) =>
+{
+    using SqliteCommand command = new(
+        "DELETE FROM Historico_Treinos WHERE id = $id", sqlConnection);
+    command.Parameters.AddWithValue("$id", id);
+
+    return command.ExecuteNonQuery() == 0
+        ? Results.NotFound()
+        : Results.NoContent();
+}).WithName("removeHistoricoTreino");
 
 app.Run();
 
@@ -580,6 +681,8 @@ record UpdateExerciseRequest(string nome, string? descricao);
 record CreatePaymentRequest(int id_membro, int id_funcionario, decimal valor, string status);
 record CreateSubscriptionRequest(int id_membro, string data_final);
 record UpdateSubscriptionRequest(string data_final);
+record CreateTrainingLogRequest(int id_membro, int id_treino, string? dia);
+record UpdateTrainingLogRequest(int id_treino, string dia);
 
 class Utils
 {
@@ -639,4 +742,23 @@ class Utils
             ativa = string.CompareOrdinal(dataFinal, DateTime.Now.ToString("yyyy-MM-dd")) >= 0
         };
     }
+    public static bool FichaPertenceAoMembro(long idMembro, long idTreino, SqliteConnection sqlConnection)
+    {
+        using var command = sqlConnection.CreateCommand();
+        command.CommandText = @"
+        SELECT COUNT(*) FROM Membros
+        WHERE id = $membro
+          AND ($treino = id_treino_a OR $treino = id_treino_b OR $treino = id_treino_c)";
+        command.Parameters.AddWithValue("$membro", idMembro);
+        command.Parameters.AddWithValue("$treino", idTreino);
+        return (long)command.ExecuteScalar()! > 0;
+    }
+
+    public static object LerHistoricoTreino(SqliteDataReader reader) => new
+    {
+        id = reader.GetInt64(0),
+        id_membro = reader.GetInt64(1),
+        id_treino = reader.GetInt64(2),
+        dia = reader.GetString(3)
+    };
 }
