@@ -1,0 +1,33 @@
+name: Testes unitários
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
+
+    steps:
+      - name: Clonar repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Rodar testes com cobertura
+        run: dotnet test backend.Tests --collect:"XPlat Code Coverage" --results-directory ./TestResults
+
+      - name: Publicar relatório de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: TestResults/**/coverage.cobertura.xml
