@@ -37,13 +37,6 @@ const parseData = (s: string) => {
   return new Date(a, m - 1, d);
 };
 
-/* depois qnd tiver o back tem q mudar pra algo assim:
-const parseData = (s: string) => {
-  const [a, m, d] = s.split("-").map(Number); // formato ISO
-  return new Date(a, m - 1, d);
-}; 
-*/
-
 const situacao = (p: Pagamento): "pago" | "aberto" | "vencido" => {
   if (p.status === "Pago") return "pago";
   const hoje = new Date();
@@ -82,7 +75,7 @@ export default function BoxTreino({ aluno }: { aluno: Aluno | null }) {
         <div>
           <div className="mb-1 flex items-center justify-between">
             <h3 className="font-bold">Treino</h3>
-            <Link href="/addwo" className="border border-black px-3 text-xs font-bold">
+            <Link href={`/addwo/${aluno.id}`} className="border border-black px-3 text-xs font-bold">
               Editar
             </Link>
           </div>

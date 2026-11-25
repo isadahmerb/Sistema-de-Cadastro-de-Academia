@@ -1,41 +1,54 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
   --blue:#99B9FF;
 }
 
+body {
+  font-family: var(--font-ubuntu), sans-serif;
+}
 
 .main-header {
   display: flex;
   flex-direction: column;
-  font-weight: bold;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  font-weight: bold;
 }
 
 .main-header h1 {
   font-size: 32px;
 }
 
-
-.body {
-  padding: 2;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-
-.content {
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-}
+/* tela de login */
 
 .login-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+
+.login-form input {
+  border: 1px solid black;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.login-form button {
+  align-self: center;
+  border: 1px solid black;
+  border-radius: 4px;
+  background: var(--blue);
+  font-weight: bold;
+  padding: 4px 32px;
+  cursor: pointer;
+}
+
+.login-form button:hover {
+  filter: brightness(0.95);
+}
+
+.login-form button:disabled {
+  opacity: 0.5;
+}
+
