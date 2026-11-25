@@ -160,6 +160,33 @@ public class ApiFactory : WebApplicationFactory<Program>
         cmd.Parameters.AddWithValue("$data", dataFinal);
         cmd.ExecuteNonQuery();
     }
+    
+    public long AddExercicio(string nome = "Supino", string? descricao = null)
+    {
+        using var conn = AbrirConexao();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+                          INSERT INTO Exercicios (nome, descricao) VALUES ($nome, $descricao);
+                          SELECT last_insert_rowid();
+                          """;
+        cmd.Parameters.AddWithValue("$nome", nome);
+        cmd.Parameters.AddWithValue("$descricao", (object?)descricao ?? DBNull.Value);
+        return (long)cmd.ExecuteScalar()!;
+    }
+    
+    public long AddSet(long idExercicio, int sets = 3, int repeticoes = 10)
+    {
+        using var conn = AbrirConexao();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+                          INSERT INTO Sets (id_exercicio, sets, repeticoes) VALUES ($e, $s, $r);
+                          SELECT last_insert_rowid();
+                          """;
+        cmd.Parameters.AddWithValue("$e", idExercicio);
+        cmd.Parameters.AddWithValue("$s", sets);
+        cmd.Parameters.AddWithValue("$r", repeticoes);
+        return (long)cmd.ExecuteScalar()!;
+    }
 }
 
 public record ClienteComFichas(long Id, long FichaA, long FichaB, long FichaC);
