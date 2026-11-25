@@ -78,7 +78,7 @@ public class ApiFactory : WebApplicationFactory<Program>
     public long AddCliente(string nome = "Ana", string? cpf = null,
                            string telefone = "48999999999", string endereco = "Rua A, 1")
     {
-        cpf ??= Interlocked.Increment(ref _seq).ToString("D11");
+        cpf ??= ProximoCpf();
 
         using var conn = AbrirConexao();
         using var cmd = conn.CreateCommand();
@@ -94,4 +94,62 @@ public class ApiFactory : WebApplicationFactory<Program>
         cmd.Parameters.AddWithValue("$data", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         return (long)cmd.ExecuteScalar()!;
     }
+    
+    private static string ProximoCpf() => Interlocked.Increment(ref _seq).ToString("D11");
+
+    public ClienteComFichas AddClienteComFichas(string nome = "Ana", string? cpf = null)
+    {
+        cpf ??= ProximoCpf();
+
+        using var conn = AbrirConexao();
+        using var tx = conn.BeginTransaction();
+
+        long NovaFicha()
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "INSERT INTO Treino DEFAULT VALUES; SELECT last_insert_rowid();";
+            return (long)cmd.ExecuteScalar()!;
+        }
+
+        long fichaA = NovaFicha();
+        long fichaB = NovaFicha();
+        long fichaC = NovaFicha();
+
+        using var insert = conn.CreateCommand();
+        insert.Transaction = tx;
+        insert.CommandText = """
+            INSERT INTO Membros (nome, cpf, telefone, endereco, data_cadastro,
+                                 id_treino_a, id_treino_b, id_treino_c)
+            VALUES ($nome, $cpf, '48999999999', 'Rua A, 1', $data, $a, $b, $c);
+            SELECT last_insert_rowid();
+            """;
+        insert.Parameters.AddWithValue("$nome", nome);
+        insert.Parameters.AddWithValue("$cpf", cpf);
+        insert.Parameters.AddWithValue("$data", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        insert.Parameters.AddWithValue("$a", fichaA);
+        insert.Parameters.AddWithValue("$b", fichaB);
+        insert.Parameters.AddWithValue("$c", fichaC);
+        long id = (long)insert.ExecuteScalar()!;
+
+        tx.Commit();
+        return new ClienteComFichas(id, fichaA, fichaB, fichaC);
+    }
+
+    public long AddHistoricoTreino(long idMembro, long idTreino, string dia = "2026-01-01")
+    {
+        using var conn = AbrirConexao();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO Historico_Treinos (id_membro, id_treino, dia)
+            VALUES ($membro, $treino, $dia);
+            SELECT last_insert_rowid();
+            """;
+        cmd.Parameters.AddWithValue("$membro", idMembro);
+        cmd.Parameters.AddWithValue("$treino", idTreino);
+        cmd.Parameters.AddWithValue("$dia", dia);
+        return (long)cmd.ExecuteScalar()!;
+    }
 }
+
+public record ClienteComFichas(long Id, long FichaA, long FichaB, long FichaC);
