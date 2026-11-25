@@ -5,3 +5,5 @@
 # Build .NET
 bin/
 obj/
+TestResults/
+cobertura-html/

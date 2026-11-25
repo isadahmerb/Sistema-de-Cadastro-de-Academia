@@ -150,6 +150,16 @@ public class ApiFactory : WebApplicationFactory<Program>
         cmd.Parameters.AddWithValue("$dia", dia);
         return (long)cmd.ExecuteScalar()!;
     }
+    
+    public void AddAssinatura(long idMembro, string dataFinal)
+    {
+        using var conn = AbrirConexao();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "INSERT INTO Validade_Assinaturas (id_membro, data_final) VALUES ($id, $data)";
+        cmd.Parameters.AddWithValue("$id", idMembro);
+        cmd.Parameters.AddWithValue("$data", dataFinal);
+        cmd.ExecuteNonQuery();
+    }
 }
 
 public record ClienteComFichas(long Id, long FichaA, long FichaB, long FichaC);

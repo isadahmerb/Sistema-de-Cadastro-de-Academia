@@ -10,8 +10,6 @@ jobs:
   testes:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
 
     steps:
       - name: Clonar repositório
@@ -23,7 +21,13 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Rodar testes com cobertura
-        run: dotnet test backend.Tests --collect:"XPlat Code Coverage" --results-directory ./TestResults
+        run: dotnet test backend.Tests --collect:"XPlat Code Coverage" --settings backend.Tests/coverage.runsettings --results-directory ./TestResults
+
+      - name: Resumo da cobertura
+        if: always()
+        run: |
+          RATE=$(grep -o 'line-rate="[0-9.]*"' TestResults/*/coverage.cobertura.xml | head -1 | grep -o '[0-9.]*')
+          echo "Cobertura de linhas: $(awk -v r="$RATE" 'BEGIN{printf "%.1f", r*100}')%" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publicar relatório de cobertura
         if: always()
