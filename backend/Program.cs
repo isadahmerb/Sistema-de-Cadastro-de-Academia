@@ -1,14 +1,15 @@
 using Microsoft.Data.Sqlite;
 using System.Security.Cryptography;
 
-var dbPath = "db.db";
+var builder = WebApplication.CreateBuilder(args);
+
+var dbPath = builder.Configuration["DbPath"] ?? "db.db";
 if (!File.Exists(dbPath))
 {
     Console.WriteLine($"Banco de dados não encontrado em {Path.GetFullPath(dbPath)}");
     Environment.Exit(1);
 }
 
-var builder = WebApplication.CreateBuilder(args);
 String connectionString = $"Data Source={dbPath};Mode=ReadWrite";
 var sqlConnection = new SqliteConnection(connectionString);
 try
@@ -671,6 +672,8 @@ app.MapDelete("/historico-treinos/{id}", (int id) =>
 }).WithName("removeHistoricoTreino");
 
 app.Run();
+
+public partial class Program { }
 
 record CreateClientRequest(string name, string cpf, string telefone, string address);
 record CreateEmployeeRequest(string name, string role, string login, string password);
