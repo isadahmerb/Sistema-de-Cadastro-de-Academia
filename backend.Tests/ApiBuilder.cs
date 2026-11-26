@@ -187,6 +187,43 @@ public class ApiFactory : WebApplicationFactory<Program>
         cmd.Parameters.AddWithValue("$r", repeticoes);
         return (long)cmd.ExecuteScalar()!;
     }
+    
+    private static long _seqFunc;
+    
+    public long AddFuncionario(string nome = "Maria", string cargo = "Recepcionista", string? login = null)
+    {
+        login ??= $"func{Interlocked.Increment(ref _seqFunc)}";
+    
+        using var conn = AbrirConexao();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO Funcionarios (nome, cargo, login, senha_hash, senha_salt)
+            VALUES ($nome, $cargo, $login, 'hash', 'salt');
+            SELECT last_insert_rowid();
+            """;
+        cmd.Parameters.AddWithValue("$nome", nome);
+        cmd.Parameters.AddWithValue("$cargo", cargo);
+        cmd.Parameters.AddWithValue("$login", login);
+        return (long)cmd.ExecuteScalar()!;
+    }
+    
+    public long AddPagamento(long idMembro, long idFuncionario, decimal valor = 100m,
+                             string status = "pago", string data = "2026-11-25 10:00:00")
+    {
+        using var conn = AbrirConexao();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO Pagamentos (id_membro, id_funcionario, valor, data_pagamento, status)
+            VALUES ($m, $f, $valor, $data, $status);
+            SELECT last_insert_rowid();
+            """;
+        cmd.Parameters.AddWithValue("$m", idMembro);
+        cmd.Parameters.AddWithValue("$f", idFuncionario);
+        cmd.Parameters.AddWithValue("$valor", valor);
+        cmd.Parameters.AddWithValue("$data", data);
+        cmd.Parameters.AddWithValue("$status", status);
+        return (long)cmd.ExecuteScalar()!;
+    }
 }
 
 public record ClienteComFichas(long Id, long FichaA, long FichaB, long FichaC);
