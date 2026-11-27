@@ -106,13 +106,6 @@ export default function BoxTreino({ aluno }: { aluno: Aluno | null }) {
                           </li>
                         ))}
                       </ul>
-                      <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="mx-auto mt-2 block text-sm font-bold hover:underline"
-                      >
-                        Imprimir Treino
-                      </button>
                     </div>
                   )}
                 </div>

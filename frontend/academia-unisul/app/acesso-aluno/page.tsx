@@ -14,9 +14,11 @@ type TreinoApi = {
 type HistoricoApi = { id: number; id_membro: number; id_treino: number; dia: string };
 type Registro = { id: number; treino: string; data: string };
 type AlunoView = {
+  id: number;
+  fichas: (number | null)[];
   nome: string;
   treinos: Treino[];
-  historico: Registro[] | null; 
+  historico: Registro[] | null;
 };
 
 
@@ -86,7 +88,7 @@ export default function AlunoPage() {
       if (!rt.ok) throw new Error();
       const { treinos }: { treinos: TreinoApi[] } = await rt.json();
 
-      
+
       let historico: Registro[] | null = null;
       if (rh.ok) {
         const regs: HistoricoApi[] = await rh.json();
@@ -101,6 +103,8 @@ export default function AlunoPage() {
       }
 
       setAluno({
+        id,
+        fichas,
         nome,
         historico,
         treinos: treinos.map((t, i) => ({
@@ -122,11 +126,37 @@ export default function AlunoPage() {
     }
   }
 
+  async function imprimir(t: Treino) {
+    if (!aluno) return;
+
+    const idTreino = aluno.fichas["ABC".indexOf(t.id)];
+    if (idTreino === null || idTreino === undefined) {
+      setErro("Este treino não está disponível para impressão");
+      return;
+    }
+
+    setErro("");
+    try {
+      const r = await fetch("/api/historico-treinos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_membro: aluno.id, id_treino: idTreino }),
+      });
+      if (!r.ok) throw new Error();
+    } catch {
+      setErro("Não foi possível registrar no histórico. O treino não foi impresso");
+      return;
+    }
+
+    window.addEventListener("afterprint", () => window.location.reload(), { once: true });
+    window.print();
+  }
+
   const treinoAberto = aluno?.treinos.find((t) => t.id === aberto) ?? null;
 
   return (
     <main style={{ margin: "10vh auto" }}>
-      
+
       <div className="print:hidden">
         <header className="main-header">
           <h1>ACADEMIA UNISUL</h1>
@@ -194,8 +224,9 @@ export default function AlunoPage() {
                           )}
                           <button
                             type="button"
-                            onClick={() => window.print()}
-                            className="mx-auto mt-2 block text-sm font-bold hover:underline"
+                            onClick={() => imprimir(t)}
+                            disabled={t.exercicios.length === 0}
+                            className="mx-auto mt-2 block text-sm font-bold hover:underline disabled:opacity-40"
                           >
                             Imprimir Treino
                           </button>
@@ -234,7 +265,7 @@ export default function AlunoPage() {
         </div>
       </div>
 
-      
+
       {aluno && treinoAberto && (
         <section className="hidden print:block">
           <h1 className="text-2xl font-bold">ACADEMIA UNISUL</h1>
